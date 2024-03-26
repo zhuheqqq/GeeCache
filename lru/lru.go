@@ -38,27 +38,50 @@ func New(maxBytes int64, onEvicted func(string, Value)) *Cache {
 	}
 }
 
-//查找：从字典中找到对应的双向链表的节点，然后移至队尾
-func (c *Cache) Get(key string)(value Value,ok bool){
-	if ele,ok : =c.cache[key];ok{
-		c.ll.MoveToFront(ele)		//将链表中的节点ele移动到队尾
+// 查找：从字典中找到对应的双向链表的节点，然后移至队尾
+func (c *Cache) Get(key string) (value Value, ok bool) {
+	//ok布尔值检查缓存是否存在给定的键
+	if ele, ok := c.cache[key]; ok {
+		c.ll.MoveToFront(ele) //将链表中的节点ele移动到队尾
 		//（双向链表作为队列，队首队尾是相对的，在这里约定 front 为队尾）
+		//ele是指向双向链表特定元素的指针
 		kv := ele.Value.(*entry)
-		return kv.value,true
+		return kv.value, true
 	}
 	return
 }
 
-//删除：缓存淘汰
+// 删除：缓存淘汰,删除最近最少访问的节点
 func (c *Cache) RemoveOldest() {
-	ele :=c.ll.Back()		//取到队首节点，从链表删除
-	if ele !=nil {
+	ele := c.ll.Back() //取到队首节点，从链表删除
+	if ele != nil {
 		c.ll.Remove(ele)
 		kv := ele.Value.(*entry)
-		delete(c.cache,kv.key)		//从字典中删除映射
-		c.nbytes -= int64(len(kv.key)) + int64(kv.value.Len())		//更新当前所用内存
+		delete(c.cache, kv.key)                                //从字典中删除映射
+		c.nbytes -= int64(len(kv.key)) + int64(kv.value.Len()) //更新当前所用内存
 		if c.onEvicted != nil {
-			c.onEvicted(kv.key,kv.value)
+			c.onEvicted(kv.key, kv.value) //如果没有提供回调函数则默认为nil
 		}
 	}
+}
+
+func (c *Cache) Add(key string, value Value) {
+	if ele, ok := c.cache[key]; ok {
+		c.ll.MoveToFront(ele)
+		kv := ele.Value.(*entry)
+		c.nbytes += int64(value.Len()) - int64(kv.value.Len())
+		kv.value = value
+	} else {
+		ele := c.ll.PushFront(&entry{key, value})
+		c.cache[key] = ele
+		c.nbytes += int64(len(key)) + int64(value.Len())
+	}
+
+	for c.maxBytes != 0 && c.maxBytes < c.nbytes {
+		c.RemoveOldest()
+	}
+}
+
+func (c *Cache) Len() int {
+	return c.ll.Len()
 }
