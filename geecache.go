@@ -10,6 +10,8 @@ type Getter interface {
 	Get(key string) ([]byte, error) //回调函数
 }
 
+type GetterFunc func(key string) ([]byte, error) //接口型函数
+
 type Group struct {
 	name      string
 	getter    Getter
@@ -20,8 +22,6 @@ var (
 	mu     sync.RWMutex
 	groups = make(map[string]*Group)
 )
-
-type GetterFunc func(key string) ([]byte, error) //接口型函数
 
 func (f GetterFunc) Get(key string) ([]byte, error) {
 	return f(key) //调用f函数并传递key参数 返回结果
@@ -55,7 +55,7 @@ func (g *Group) Get(key string) (ByteView, error) {
 	}
 
 	if v, ok := g.mainCache.get(key); ok {
-		log.Panicln("[GeeCache] hit")
+		log.Println("[GeeCache] hit")
 		return v, nil
 	}
 	return g.load(key)

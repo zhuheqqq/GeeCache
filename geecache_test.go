@@ -20,7 +20,7 @@ func TestGetter(t *testing.T) {
 
 	expect := []byte("key")
 	if v, _ := f.Get("key"); !reflect.DeepEqual(v, expect) {
-		t.Errorf("callback failed")
+		t.Fatal("callback failed")
 	}
 }
 
@@ -33,7 +33,7 @@ func TestGet(t *testing.T) {
 				if _, ok := loadCounts[key]; !ok {
 					loadCounts[key] = 0
 				}
-				loadCounts[key] += 1
+				loadCounts[key]++
 				return []byte(v), nil
 			}
 			return nil, fmt.Errorf("%s not exist", key)
@@ -44,11 +44,24 @@ func TestGet(t *testing.T) {
 			t.Fatal("failed to get value of Tom")
 		}
 		if _, err := gee.Get(k); err != nil || loadCounts[k] > 1 {
-			t.Fatal("cache %s miss", k)
+			t.Fatalf("cache %s miss", k)
 		}
 	}
 
 	if view, err := gee.Get("unknown"); err == nil {
-		t.Fatal("the value of unknow should be empty, but %s got", view)
+		t.Fatalf("the value of unknow should be empty, but %s got", view)
+	}
+}
+
+func TestGetGroup(t *testing.T) {
+	groupName := "scores"
+	NewGroup(groupName, 2<<10, GetterFunc(
+		func(key string) (bytes []byte, err error) { return }))
+	if group := GetGroup(groupName); group == nil || group.name != groupName {
+		t.Fatalf("group %s not exist", groupName)
+	}
+
+	if group := GetGroup(groupName + "111"); group != nil {
+		t.Fatalf("expect nil, but %s got", group.name)
 	}
 }
