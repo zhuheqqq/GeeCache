@@ -27,13 +27,15 @@ func (p *HTTPPool) Log(format string, v ...interface{}) {
 }
 
 // w用于向客户端发送http响应，可以设置响应的状态码、响应头、响应体
-// v代表客户端发起的HTTP请求
+// r代表客户端发起的HTTP请求
 func (p *HTTPPool) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	//是否以特定的前缀开头
 	if !strings.HasPrefix(r.URL.Path, p.basePath) {
 		panic("HTTPPool sreving unexpected path: " + r.URL.Path)
 	}
 	p.Log("%s %s", r.Method, r.URL.Path)
 
+	//路径切割
 	parts := strings.SplitN(r.URL.Path[len(p.basePath):], "/", 2)
 	if len(parts) != 2 {
 		http.Error(w, "bad request", http.StatusBadRequest)
