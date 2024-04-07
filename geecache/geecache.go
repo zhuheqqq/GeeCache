@@ -1,6 +1,7 @@
 package geecache
 
 import (
+	"GeeCache/singleflight"
 	"fmt"
 	"log"
 	"sync"
@@ -19,6 +20,7 @@ type Group struct {
 	getter    Getter     //获取数据，这里会传入具体的方法
 	mainCache cache      //指定缓存大小
 	peers     PeerPicker //用于选择远程节点
+	loader    *singleflight.Group
 }
 
 var (
@@ -35,15 +37,22 @@ func (g *Group) RegisterPeers(peers PeerPicker) {
 
 // 如果有远程节点则从远程节点获取值，否则从本地获取值
 func (g *Group) load(key string) (value ByteView, err error) {
-	if g.peers != nil {
-		if peer, ok := g.peers.PickPeer(key); ok {
-			if value, err = g.getFromPeer(peer, key); err == nil {
-				return value, nil
+	viewi, err := g.loader.Do(key, func() (interface{}, error) {
+		if g.peers != nil {
+			if peer, ok := g.peers.PickPeer(key); ok {
+				if value, err = g.getFromPeer(peer, key); err == nil {
+					return value, nil
+				}
+				log.Println("[GeeCache] Failed to get from peer", err)
 			}
-			log.Println("[GeeCache] Failed to get from peer", err)
 		}
+		return g.getLocally(key)
+	})
+
+	if err == nil {
+		return viewi.(ByteView), nil
 	}
-	return g.getLocally(key)
+	return
 }
 
 func (g *Group) getFromPeer(peer PeerGetter, key string) (ByteView, error) {
@@ -69,6 +78,7 @@ func NewGroup(name string, cacheBytes int64, getter Getter) *Group {
 		name:      name,
 		getter:    getter,
 		mainCache: cache{cacheBytes: cacheBytes},
+		loader:    &singleflight.Group{},
 	}
 	groups[name] = g
 	return g
